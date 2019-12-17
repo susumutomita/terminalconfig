@@ -2,35 +2,12 @@
 # 環境変数
 export LANG=ja_JP.UTF-8
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/sbin:/usr/local/bin
-export GOPATH=$HOME/dev
-export PATH=$GOPATH/bin:$PATH
-export PYENV_ROOT=$HOME/.pyenv
-export PATH=$PYENV_ROOT/bin:$PATH
-#eval "$(pyenv init -)"
-#eval "$(pyenv virtualenv-init -)"
-# 色を使用出来るようにする
-autoload -Uz colors
-colors
-# emacs 風キーバインドにする
-bindkey -e
+
 # ヒストリの設定
 HISTFILE=~/.zsh_history
 HISTSIZE=1000000
 SAVEHIST=1000000
-# プロンプト
-# 1行表示
-# PROMPT="%~ %# "
-# 2行表示
-PROMPT="%{${fg[red]}%}[%n@%m]%{${reset_color}%} %~
-%# "
-# 単語の区切り文字を指定する
-autoload -Uz select-word-style
-select-word-style default
-# ここで指定した文字は単語区切りとみなされる
-# / も区切りと扱うので、^W でディレクトリ１つ分を削除できる
-zstyle ':zle:*' word-chars " /=;@:{},|"
-zstyle ':zle:*' word-style unspecified
-########################################
+
 # 補完
 # 補完機能を有効にする
 autoload -Uz compinit
@@ -40,22 +17,6 @@ zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 # ../ の後は今いるディレクトリを補完しない
 zstyle ':completion:*' ignore-parents parent pwd ..
 # sudo の後ろでコマンド名を補完する
-zstyle ':completion:*:sudo:*' command-path /usr/local/sbin /usr/local/bin \
-                   /usr/sbin /usr/bin /sbin /bin /usr/X11R6/bin
-# ps コマンドのプロセス名補完
-zstyle ':completion:*:processes' command 'ps x -o pid,s,args'
-########################################
-# vcs_info
-autoload -Uz vcs_info
-zstyle ':vcs_info:*' formats '(%s)-[%b]'
-zstyle ':vcs_info:*' actionformats '(%s)-[%b|%a]'
-precmd () {
-    psvar=()
-    LANG=en_US.UTF-8 vcs_info
-    [[ -n "$vcs_info_msg_0_" ]] && psvar[1]="$vcs_info_msg_0_"
-}
-RPROMPT="%1(v|%F{green}%1v%f|)"
-########################################
 # オプション
 # 日本語ファイル名を表示可能にする
 setopt print_eight_bit
@@ -85,12 +46,6 @@ setopt hist_ignore_space
 setopt hist_reduce_blanks
 # 補完候補が複数あるときに自動的に一覧表示する
 setopt auto_menu
-# 高機能なワイルドカード展開を使用する
-#setopt extended_glob
-########################################
-# キーバインド
-# ^R で履歴検索をするときに * でワイルドカードを使用出来るようにする
-bindkey '^R' history-incremental-pattern-search-backward
 ########################################
 # エイリアス
 alias la='ls -al'
@@ -107,26 +62,8 @@ if which pbcopy >/dev/null 2>&1 ; then
 # Mac
 alias -g C='| pbcopy'
 elif which xsel >/dev/null 2>&1 ; then
-# Linux
-alias -g C='| xsel --input --clipboard'
-elif which putclip >/dev/null 2>&1 ; then
-# Cygwin
-alias -g C='| putclip'
-fi
-########################################
-# OS 別の設定
-case ${OSTYPE} in
-    darwin*)
-#Mac用の設定
-export CLICOLOR=1
-alias ls='ls -G -F'
-        ;;
-    linux*)
-#Linux用の設定
-        ;;
-esac
-# vim:set ft=zsh:
 
-#pure 
-autoload -U promptinit; promptinit
-prompt pure
+# Thme の設定
+if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
+  source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
+fi
