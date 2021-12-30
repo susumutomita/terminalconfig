@@ -66,8 +66,5 @@ let g:hybrid_use_iTerm_colors = 1
 colorscheme hybrid
 syntax on
 
-" 行番号の色を設定
-hi LineNr ctermbg=0 ctermfg=0
-hi CursorLineNr ctermbg=4 ctermfg=0
 set cursorline
 hi clear CursorLine
