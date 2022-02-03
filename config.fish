@@ -7,7 +7,7 @@ set -g theme_color_scheme dark
 #path
 set -x PATH $HOME/.nodebrew/current/bin $PATH
 export LANG=ja_JP.UTF-8
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/sbin:/usr/local/bin/Users/susumu/.pyenv/bin:/opt/homebrew/bin:/opt/homebrew/sbin
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin
 export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
 
