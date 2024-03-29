@@ -1,70 +1,47 @@
-" setting
-"文字コードをUFT-8に設定
-set fenc=utf-8
-" バックアップファイルを作らない
-set nobackup
-" スワップファイルを作らない
-set noswapfile
-" 編集中のファイルが変更されたら自動で読み直す
-set autoread
-" バッファが編集中でもその他のファイルを開けるように
-set hidden
-" 入力中のコマンドをステータスに表示する
-set showcmd
-
+" 基本設定
+set fenc=utf-8            " 文字コードをUTF-8に設定
+set nobackup              " バックアップファイルを作らない
+set noswapfile            " スワップファイルを作らない
+set autoread              " 編集中のファイルが変更されたら自動で読み直す
+set hidden                " バッファが編集中でも他のファイルを開ける
+set showcmd               " 入力中のコマンドをステータスに表示
 
 " 見た目系
-" 行番号を表示
-set number
-" 現在の行を強調表示
-set cursorline
-" 現在の行を強調表示（縦）
-set cursorcolumn
-" 行末の1文字先までカーソルを移動できるように
-set virtualedit=onemore
-" インデントはスマートインデント
-set smartindent
-" ビープ音を可視化
-set visualbell
-" 括弧入力時の対応する括弧を表示
-set showmatch
-" ステータスラインを常に表示
-set laststatus=2
-" コマンドラインの補完
-set wildmode=list:longest
-" 折り返し時に表示行単位での移動できるようにする
+set number                " 行番号を表示
+set cursorline            " 現在の行を強調表示
+set cursorcolumn          " 現在の列を強調表示
+set virtualedit=onemore   " 行末の1文字先までカーソルを移動
+set smartindent           " スマートインデント
+set visualbell            " ビープ音を可視化
+set showmatch             " 括弧の対応を表示
+set laststatus=2          " ステータスラインを常に表示
+set wildmode=list:longest " コマンドライン補完の設定
+
+" 折り返し時のカーソル移動
 nnoremap j gj
 nnoremap k gk
 
-
-" Tab系
-" 不可視文字を可視化(タブが「▸-」と表示される)
+" タブとスペース
 set list listchars=tab:\▸\-
-" Tab文字を半角スペースにする
-set expandtab
-" 行頭以外のTab文字の表示幅（スペースいくつ分）
-set tabstop=2
-" 行頭でのTab文字の表示幅
-set shiftwidth=2
-
+set expandtab             " タブをスペースに変換
+set tabstop=2             " タブの表示幅
+set shiftwidth=2          " シフト幅
 
 " 検索系
-" 検索文字列が小文字の場合は大文字小文字を区別なく検索する
-set ignorecase
-" 検索文字列に大文字が含まれている場合は区別して検索する
-set smartcase
-" 検索文字列入力時に順次対象文字列にヒットさせる
-set incsearch
-" 検索時に最後まで行ったら最初に戻る
-set wrapscan
-" 検索語をハイライト表示
-set hlsearch
-" ESC連打でハイライト解除
+set ignorecase            " 大文字小文字を区別しない検索
+set smartcase             " 検索文字に大文字が含まれていれば区別
+set incsearch             " インクリメンタル検索
+set wrapscan              " 検索がファイル末尾で折り返す
+set hlsearch              " 検索語をハイライト表示
+
+" ハイライト解除
 nmap <Esc><Esc> :nohlsearch<CR><Esc>
 
+" カラースキーム
 let g:hybrid_use_iTerm_colors = 1
 colorscheme hybrid
 syntax on
 
+" 行番号の色設定
 set cursorline
 hi clear CursorLine
