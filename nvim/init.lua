@@ -114,6 +114,25 @@ require("lazy").setup({
     dependencies = { "nvim-lua/plenary.nvim" },
   },
 
+  -- Space を押すと「今押せる操作の一覧」をメニュー表示
+  {
+    "folke/which-key.nvim",
+    event = "VeryLazy",
+    opts = {
+      delay = 200, -- Space を押してからメニューが出るまで(ミリ秒)
+      preset = "modern",
+    },
+    config = function(_, opts)
+      local wk = require("which-key")
+      wk.setup(opts)
+      -- グループ名（サブメニューの見出し）を登録
+      wk.add({
+        { "<leader>f", group = "検索" },
+        { "<leader>c", group = "Claude" },
+      })
+    end,
+  },
+
   -- 保存時の自動フォーマット & 末尾空白の自動トリム
   {
     "stevearc/conform.nvim",
@@ -200,3 +219,110 @@ map("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Claude Code 開閉" })
 -- ブラウザでライブプレビュー（Markdown / HTML）。v = view
 map("n", "<leader>v", "<cmd>LivePreview start<CR>", { desc = "ブラウザでプレビュー開始" })
 map("n", "<leader>V", "<cmd>LivePreview close<CR>", { desc = "プレビュー停止" })
+
+--------------------------------------------------------------------------------
+-- 5. ローカル LLM ガイド（Space ? で「やりたいこと」を聞くと、実 keymap に基づき回答）
+--    Ollama (localhost:11434) を使う。邪魔しないよう非同期 & 非フォーカス窓で表示。
+--------------------------------------------------------------------------------
+local guide = {}
+guide.model = "qwen2.5:3b" -- 使うローカルモデル。変えたいときはここだけ
+guide.url = "http://localhost:11434/api/generate"
+guide.win = nil
+
+-- 既存のガイド窓を閉じる
+local function guide_close()
+  if guide.win and vim.api.nvim_win_is_valid(guide.win) then
+    vim.api.nvim_win_close(guide.win, true)
+  end
+  guide.win = nil
+end
+
+-- 右下に非フォーカスのフローティング窓でテキストを表示する
+local function guide_show(text)
+  guide_close()
+  local lines = vim.split(text, "\n", { trimempty = false })
+  local width = 24
+  for _, l in ipairs(lines) do
+    width = math.max(width, vim.fn.strdisplaywidth(l))
+  end
+  width = math.min(width + 2, 56)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modifiable = false
+  guide.win = vim.api.nvim_open_win(buf, false, {
+    relative = "editor",
+    anchor = "SE",
+    row = vim.o.lines - 2,
+    col = vim.o.columns - 1,
+    width = width,
+    height = math.min(#lines, 12),
+    style = "minimal",
+    border = "rounded",
+    focusable = false, -- フォーカスを奪わない
+    title = " ガイド ",
+    title_pos = "center",
+    noautocmd = true,
+  })
+  vim.wo[guide.win].wrap = true
+  -- カーソルを動かす / 入力を始めると自動で閉じる（操作を邪魔しない）
+  vim.api.nvim_create_autocmd({ "CursorMoved", "InsertEnter", "BufLeave" }, {
+    once = true,
+    callback = guide_close,
+  })
+end
+
+-- ノーマルモードの keymap のうち説明付きのものを集めてプロンプトに渡す（幻覚防止）
+local function guide_keymaps()
+  local out = {}
+  for _, m in ipairs(vim.api.nvim_get_keymap("n")) do
+    if m.desc and m.desc ~= "" then
+      local lhs = (m.lhs:gsub("^ ", "Space ")) -- 先頭のリーダー(空白)を読みやすく
+      table.insert(out, lhs .. " = " .. m.desc)
+    end
+  end
+  return table.concat(out, "\n")
+end
+
+function guide.ask()
+  vim.ui.input({ prompt = "やりたいこと: " }, function(input)
+    if not input or input == "" then
+      return
+    end
+    guide_show("考え中...")
+    local prompt = table.concat({
+      "あなたは Neovim の操作ガイドです。",
+      "以下はユーザーの実際のキーマップ一覧です。この一覧に実在するキーだけを使い、",
+      "やりたいことに対する最短手順を日本語で 2〜4 行で簡潔に答えてください。",
+      "一覧に無い操作は『この設定には無い』とだけ答えてください。前置きは不要です。",
+      "",
+      "# キーマップ一覧",
+      guide_keymaps(),
+      "",
+      "# やりたいこと",
+      input,
+      "",
+      "# 回答（キーと手順のみ）",
+    }, "\n")
+    local body = vim.json.encode({ model = guide.model, prompt = prompt, stream = false })
+    vim.system({ "curl", "-s", guide.url, "-d", body }, { text = true }, function(res)
+      vim.schedule(function()
+        if res.code ~= 0 then
+          guide_show("LLM に接続できません。\n`ollama serve` が動いているか確認してください。")
+          return
+        end
+        local ok, decoded = pcall(vim.json.decode, res.stdout)
+        if not ok or type(decoded) ~= "table" then
+          guide_show("応答の解析に失敗しました。")
+          return
+        end
+        if decoded.error then
+          guide_show("モデルが見つかりません。\nollama pull " .. guide.model .. " を実行してください。")
+          return
+        end
+        guide_show(vim.trim(decoded.response or "(空の応答)"))
+      end)
+    end)
+  end)
+end
+
+map("n", "<leader>?", guide.ask, { desc = "やりたいことを LLM に聞く" })
