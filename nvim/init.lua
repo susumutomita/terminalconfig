@@ -222,10 +222,12 @@ map("n", "<leader>V", "<cmd>LivePreview close<CR>", { desc = "プレビュー停
 
 --------------------------------------------------------------------------------
 -- 5. ローカル LLM ガイド（Space ? で「やりたいこと」を聞くと、実 keymap に基づき回答）
---    Ollama (localhost:11434) を使う。邪魔しないよう非同期 & 非フォーカス窓で表示。
+--    バックエンドは afm（Apple オンデバイス LLM / FoundationModels）を優先し、
+--    無ければ Ollama にフォールバックする。邪魔しないよう非同期 & 非フォーカス窓で表示。
+--    afm のビルド: swiftc -O ~/.config/nvim/afm.swift -o ~/.local/bin/afm
 --------------------------------------------------------------------------------
 local guide = {}
-guide.model = "qwen2.5:3b" -- 使うローカルモデル。変えたいときはここだけ
+guide.model = "qwen2.5:3b" -- Ollama フォールバック時に使うモデル
 guide.url = "http://localhost:11434/api/generate"
 guide.win = nil
 
@@ -271,16 +273,73 @@ local function guide_show(text)
   })
 end
 
--- ノーマルモードの keymap のうち説明付きのものを集めてプロンプトに渡す（幻覚防止）
+-- リーダー(Space)始まりの自作キーのうち説明付きを集めてプロンプトに渡す。
+-- 標準キーの英語/コード/記号を混ぜるとオンデバイスモデルの言語判定が誤作動する
+-- (unsupportedLanguageOrLocale) ため、日本語説明の自作キーだけに絞る（幻覚防止も兼ねる）。
 local function guide_keymaps()
   local out = {}
   for _, m in ipairs(vim.api.nvim_get_keymap("n")) do
-    if m.desc and m.desc ~= "" then
-      local lhs = (m.lhs:gsub("^ ", "Space ")) -- 先頭のリーダー(空白)を読みやすく
-      table.insert(out, lhs .. " = " .. m.desc)
+    if m.desc and m.desc ~= "" and m.lhs:sub(1, 1) == " " then
+      table.insert(out, "Space " .. m.lhs:sub(2) .. " = " .. m.desc)
     end
   end
   return table.concat(out, "\n")
+end
+
+-- LLM を実行する。afm（Apple オンデバイス）があれば優先、無ければ Ollama。
+local function guide_run(prompt, on_done)
+  if vim.fn.executable("afm") == 1 then
+    vim.system({ "afm" }, { stdin = prompt, text = true }, function(res)
+      vim.schedule(function()
+        local out = vim.trim(res.stdout or "")
+        if res.code == 0 and out ~= "" then
+          on_done(out)
+        else
+          local msg = vim.trim(res.stderr or "")
+          on_done(nil, msg ~= "" and msg or "afm: 応答なし")
+        end
+      end)
+    end)
+    return
+  end
+  -- フォールバック: Ollama (localhost:11434)
+  local body = vim.json.encode({ model = guide.model, prompt = prompt, stream = false })
+  vim.system({ "curl", "-s", guide.url, "-d", body }, { text = true }, function(res)
+    vim.schedule(function()
+      if res.code ~= 0 then
+        on_done(nil, "afm も Ollama も使えません。afm をビルドするか Ollama を起動してください。")
+        return
+      end
+      local ok, decoded = pcall(vim.json.decode, res.stdout)
+      if not ok or type(decoded) ~= "table" then
+        on_done(nil, "応答の解析に失敗しました。")
+        return
+      end
+      if decoded.error then
+        on_done(nil, "モデル未取得: ollama pull " .. guide.model)
+        return
+      end
+      on_done(vim.trim(decoded.response or ""))
+    end)
+  end)
+end
+
+-- LLM へ渡すプロンプト。実 keymap だけから 1 つ選ばせて幻覚を防ぐ。
+local function guide_prompt(input)
+  return table.concat({
+    "あなたは Neovim 操作ガイド。下の一覧から質問に最も合う操作を 1 つだけ選ぶ。",
+    "各行の説明文と質問を照合して選ぶこと。回答は必ず次の形式のみ:",
+    "Space <キー> — <その操作の説明>",
+    "一覧に該当が無ければ「この設定には無い」とだけ答える。前置き・補足は禁止。",
+    "",
+    "# キーマップ一覧",
+    guide_keymaps(),
+    "",
+    "# 質問",
+    input,
+    "",
+    "# 回答",
+  }, "\n")
 end
 
 function guide.ask()
@@ -289,38 +348,8 @@ function guide.ask()
       return
     end
     guide_show("考え中...")
-    local prompt = table.concat({
-      "あなたは Neovim の操作ガイドです。",
-      "以下はユーザーの実際のキーマップ一覧です。この一覧に実在するキーだけを使い、",
-      "やりたいことに対する最短手順を日本語で 2〜4 行で簡潔に答えてください。",
-      "一覧に無い操作は『この設定には無い』とだけ答えてください。前置きは不要です。",
-      "",
-      "# キーマップ一覧",
-      guide_keymaps(),
-      "",
-      "# やりたいこと",
-      input,
-      "",
-      "# 回答（キーと手順のみ）",
-    }, "\n")
-    local body = vim.json.encode({ model = guide.model, prompt = prompt, stream = false })
-    vim.system({ "curl", "-s", guide.url, "-d", body }, { text = true }, function(res)
-      vim.schedule(function()
-        if res.code ~= 0 then
-          guide_show("LLM に接続できません。\n`ollama serve` が動いているか確認してください。")
-          return
-        end
-        local ok, decoded = pcall(vim.json.decode, res.stdout)
-        if not ok or type(decoded) ~= "table" then
-          guide_show("応答の解析に失敗しました。")
-          return
-        end
-        if decoded.error then
-          guide_show("モデルが見つかりません。\nollama pull " .. guide.model .. " を実行してください。")
-          return
-        end
-        guide_show(vim.trim(decoded.response or "(空の応答)"))
-      end)
+    guide_run(guide_prompt(input), function(answer, err)
+      guide_show(answer or ("エラー: " .. (err or "不明")))
     end)
   end)
 end

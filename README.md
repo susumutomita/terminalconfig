@@ -67,13 +67,23 @@ ln -sf "$(pwd)/nvim/init.lua" ~/.config/nvim/init.lua
 
 ### ローカル LLM ガイド（`Space ?`）
 
-`Space ?` で「やりたいこと」を自然言語で入力すると、ローカル LLM が現在の設定に実在するキーマップだけを使って手順を答える。回答は右下の非フォーカス窓に出るので操作を邪魔しない。
+`Space ?` で「やりたいこと」を自然言語で入力すると、ローカル LLM が現在の設定に実在するキーマップ（リーダー始まりの自作キー）だけから最も合う操作を選んで答える。回答は右下の非フォーカス窓に出るので操作を邪魔しない。
 
-セットアップ:
+バックエンドは 2 段構え。
 
-```sh
-brew install --cask ollama   # または https://ollama.com からアプリを入れる
-ollama pull qwen2.5:3b        # 使うモデル（init.lua の guide.model で変更可）
-```
+1. `afm`（Apple オンデバイス LLM / FoundationModels）を優先。クラウド送信なし・モデルのダウンロード不要。`nvim/afm.swift` をビルドして使う。
 
-Ollama アプリ（サーバー）が起動している必要がある。停止中は `Space ?` が接続エラーを表示する。`localhost:11434` を使うため特定マシンに依存しない。
+   ```sh
+   swiftc -O nvim/afm.swift -o ~/.local/bin/afm
+   ```
+
+   要件は macOS 26 以降 + Apple Intelligence 有効 + 対応 Mac（Apple Silicon）。`~/.local/bin` が PATH に入っていること。コンパイル済みバイナリは環境依存のためコミットしない。
+
+2. `afm` が無い環境では Ollama にフォールバックする。
+
+   ```sh
+   brew install --cask ollama
+   ollama pull qwen2.5:3b   # init.lua の guide.model で変更可
+   ```
+
+どちらも使えない場合は `Space ?` がセットアップを促すメッセージを表示する。
