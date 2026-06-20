@@ -30,7 +30,7 @@ export PATH="$HOME/.local/bin:$PATH"
 eval "$(mise activate zsh)"
 
 # bun completions
-[ -s "/Users/susumu/.bun/_bun" ] && source "/Users/susumu/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
