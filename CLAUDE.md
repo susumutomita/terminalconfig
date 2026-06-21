@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-個人のターミナル設定（dotfiles）リポジトリ。Neovim・zsh・Ghostty・Vim の設定を管理する。
+個人のターミナル設定（dotfiles）リポジトリ。Neovim・zsh・Ghostty の設定を管理する。
 
 ## リポジトリ構成
 
@@ -10,7 +10,6 @@
 | `nvim/afm.swift` | ビルドして `~/.local/bin/afm` | Apple オンデバイス LLM CLI のソース |
 | `ghostty/config` | `~/.config/ghostty/config` | Ghostty 設定 |
 | `.zshrc` | `~/.zshrc` | zsh 設定 |
-| `.vimrc` | `~/.vimrc` | Vim 設定 |
 
 配置はシンボリックリンク推奨（例: `ln -sf "$(pwd)/nvim/init.lua" ~/.config/nvim/init.lua`）。
 

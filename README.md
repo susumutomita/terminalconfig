@@ -10,7 +10,6 @@
 | `nvim/afm.swift` | Apple オンデバイス LLM CLI のソース（ビルドして使う） |
 | `ghostty/config` | Ghostty 設定 |
 | `.zshrc` | zsh 設定（prompt pure / mise / bun / 補完 / エイリアス） |
-| `.vimrc` | Vim 設定 |
 
 ## Neovim セットアップ
 

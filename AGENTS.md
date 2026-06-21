@@ -2,7 +2,7 @@
 
 AI エージェント（Claude Code, Codex 等）向けの作業ガイド。`CLAUDE.md` を補完する。
 
-このリポジトリは個人の dotfiles（Neovim / zsh / Ghostty / Vim）。配置・ビルド・規則の詳細は `CLAUDE.md` を参照する。
+このリポジトリは個人の dotfiles（Neovim / zsh / Ghostty）。配置・ビルド・規則の詳細は `CLAUDE.md` を参照する。
 
 ## 必ず守ること
 
