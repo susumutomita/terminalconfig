@@ -174,9 +174,16 @@ require("lazy").setup({
     config = function()
       require("claude-code").setup({
         window = {
-          position = "vertical", -- 右側に縦分割で開く（VSCode の AI パネル風）
-          split_ratio = 0.4, -- 画面の 40% 幅
+          position = "float", -- 画面中央にフローティング表示（分割せずレイアウトを邪魔しない）
           enter_insert = true, -- 開いたら即入力モード
+          float = {
+            width = "85%",
+            height = "85%",
+            row = "center",
+            col = "center",
+            relative = "editor",
+            border = "rounded",
+          },
         },
         git = { use_git_root = true }, -- git リポジトリのルートで起動
         command = "claude",
