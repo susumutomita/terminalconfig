@@ -7,10 +7,10 @@
 | パス | 内容 |
 | --- | --- |
 | `nvim/init.lua` | Neovim 設定（キーボードだけで開発が完結する構成） |
-| `.vimrc` | Vim 設定 |
+| `nvim/afm.swift` | Apple オンデバイス LLM CLI のソース（ビルドして使う） |
+| `ghostty/config` | Ghostty 設定 |
 | `.zshrc` | zsh 設定（prompt pure / mise / bun / 補完 / エイリアス） |
-| `config.fish` | fish 設定 |
-| `wezterm/` | WezTerm 設定 |
+| `.vimrc` | Vim 設定 |
 
 ## Neovim セットアップ
 
