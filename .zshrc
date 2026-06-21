@@ -22,6 +22,9 @@ alias mkdir='mkdir -p'
 alias sudo='sudo '  # sudo の後のコマンドでエイリアスを有効にする
 alias -g L='| less'
 alias -g G='| grep'
+# vim / vi と打ったら Neovim を起動する
+alias vim='nvim'
+alias vi='nvim'
 
 fpath+=("$(brew --prefix)/share/zsh/site-functions")
 autoload -U promptinit; promptinit
