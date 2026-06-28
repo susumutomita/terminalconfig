@@ -99,10 +99,70 @@ require("lazy").setup({
     "nvim-tree/nvim-tree.lua",
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
+      local api = require("nvim-tree.api")
+
+      -- 右クリックメニューの「ブラウザ系」項目から呼ぶヘルパ。
+      -- いずれもカーソル直下のノード（右クリックした行）を対象にする。
+      _G.TreeBrowser = {
+        -- 静的に既定ブラウザで開く（file://、サーバ不要・どんなファイルでも開ける）
+        open = function()
+          local node = api.tree.get_node_under_cursor()
+          if node and node.absolute_path then
+            vim.ui.open(node.absolute_path)
+          end
+        end,
+        -- live-preview サーバで開く（HTML / Markdown 等を自動リロード付きで表示）
+        live = function()
+          local node = api.tree.get_node_under_cursor()
+          if node and node.absolute_path then
+            vim.cmd("LivePreview start " .. vim.fn.fnameescape(node.absolute_path))
+          end
+        end,
+      }
+
+      -- 右クリックメニュー本体（マウスでクリックして選べるネイティブ popup）。
+      -- ラベルは日本語。"." はサブメニュー区切りなので各項目をベタ書きする。
+      -- 既定キー(d=削除 / r=リネーム)はそのまま残るので、キーボードでも操作できる。
+      vim.cmd([[
+        silent! aunmenu TreeCtx
+        nnoremenu TreeCtx.開く            <Cmd>lua require('nvim-tree.api').node.open.edit()<CR>
+        nnoremenu TreeCtx.ブラウザで開く  <Cmd>lua _G.TreeBrowser.open()<CR>
+        nnoremenu TreeCtx.ライブプレビュー <Cmd>lua _G.TreeBrowser.live()<CR>
+        nnoremenu TreeCtx.-sep1-          <Nop>
+        nnoremenu TreeCtx.リネーム        <Cmd>lua require('nvim-tree.api').fs.rename()<CR>
+        nnoremenu TreeCtx.削除            <Cmd>lua require('nvim-tree.api').fs.remove()<CR>
+        nnoremenu TreeCtx.-sep2-          <Nop>
+        nnoremenu TreeCtx.新規作成        <Cmd>lua require('nvim-tree.api').fs.create()<CR>
+        nnoremenu TreeCtx.切り取り        <Cmd>lua require('nvim-tree.api').fs.cut()<CR>
+        nnoremenu TreeCtx.コピー          <Cmd>lua require('nvim-tree.api').fs.copy.node()<CR>
+        nnoremenu TreeCtx.貼り付け        <Cmd>lua require('nvim-tree.api').fs.paste()<CR>
+      ]])
+
       require("nvim-tree").setup({
         view = { width = 32 },
         renderer = { group_empty = true },
         filters = { dotfiles = false }, -- ドットファイルも表示
+        on_attach = function(bufnr)
+          -- 既定のキー操作（d=削除 / r=リネーム / a=新規 など）はそのまま残す
+          api.config.mappings.default_on_attach(bufnr)
+          local function opts(desc)
+            return { desc = "nvim-tree: " .. desc, buffer = bufnr, noremap = true, silent = true, nowait = true }
+          end
+          -- 押した瞬間にクリック位置の行へカーソルを移動する
+          vim.keymap.set("n", "<RightMouse>", function()
+            local m = vim.fn.getmousepos()
+            if m.winid ~= 0 and m.line and m.line > 0 then
+              pcall(vim.api.nvim_set_current_win, m.winid)
+              pcall(vim.api.nvim_win_set_cursor, m.winid, { m.line, 0 })
+            end
+          end, opts("右クリック位置へカーソル移動"))
+          -- ボタンを離したらカーソル直下のノードに対してメニューを開く
+          vim.keymap.set("n", "<RightRelease>", function()
+            if api.tree.get_node_under_cursor() then
+              vim.cmd("popup TreeCtx")
+            end
+          end, opts("右クリックメニュー（削除 / リネーム ほか）"))
+        end,
       })
     end,
   },
@@ -112,6 +172,26 @@ require("lazy").setup({
     "nvim-telescope/telescope.nvim",
     branch = "0.1.x",
     dependencies = { "nvim-lua/plenary.nvim" },
+    config = function()
+      local actions = require("telescope.actions")
+      require("telescope").setup({
+        defaults = {
+          -- 検索窓を開いている間のキー。覚える数を減らすため hjkl 寄せ。
+          -- 迷ったら検索窓で <C-/> を押すと、その場で全キー一覧が出る（覚えなくていい）。
+          mappings = {
+            i = {
+              ["<C-j>"] = actions.move_selection_next, -- 次の候補へ
+              ["<C-k>"] = actions.move_selection_previous, -- 前の候補へ
+              ["<C-v>"] = actions.select_vertical, -- 右に縦分割で開く
+              ["<C-x>"] = actions.select_horizontal, -- 下に横分割で開く
+              ["<C-t>"] = actions.select_tab, -- 新しいタブで開く
+              ["<C-q>"] = actions.send_to_qflist + actions.open_qflist, -- 全件をまとめて開く(quickfix)
+              ["<Esc>"] = actions.close, -- Esc 一発で閉じる
+            },
+          },
+        },
+      })
+    end,
   },
 
   -- Space を押すと「今押せる操作の一覧」をメニュー表示
@@ -119,7 +199,7 @@ require("lazy").setup({
     "folke/which-key.nvim",
     event = "VeryLazy",
     opts = {
-      delay = 200, -- Space を押してからメニューが出るまで(ミリ秒)
+      delay = 100, -- Space を押してからメニューが出るまで(ミリ秒)。短いほど「覚えなくていい」
       preset = "modern",
     },
     config = function(_, opts)
@@ -128,6 +208,7 @@ require("lazy").setup({
       -- グループ名（サブメニューの見出し）を登録
       wk.add({
         { "<leader>f", group = "検索" },
+        { "<leader>w", group = "ウィンドウ" },
         { "<leader>c", group = "Claude" },
       })
     end,
@@ -167,6 +248,25 @@ require("lazy").setup({
     end,
   },
 
+  -- クリップボードの画像を貼り付け（ファイルに保存し、その場へリンクを挿入）。
+  -- macOS では pngpaste が必須（brew install pngpaste）。スクショ等をコピーしてから
+  -- 本文の入れたい位置で <leader>p（Space p）。Markdown なら ![]() が入る。
+  {
+    "HakonHarnes/img-clip.nvim",
+    event = "VeryLazy",
+    opts = {
+      default = {
+        dir_path = "assets", -- 画像の保存先フォルダ（なければ自動作成）
+        relative_to_current_file = true, -- 編集中ファイルと同じ場所の assets/ に置く
+        prompt_for_file_name = true, -- 保存名を聞く（空 Enter で日時名）
+        insert_mode_after_paste = false, -- 貼り付け後はノーマルモードのまま
+      },
+    },
+    keys = {
+      { "<leader>p", "<cmd>PasteImage<cr>", desc = "画像をクリップボードから貼り付け" },
+    },
+  },
+
   -- Claude Code 一体化
   {
     "greggh/claude-code.nvim",
@@ -189,6 +289,27 @@ require("lazy").setup({
         command = "claude",
       })
     end,
+  },
+
+  -- annai.nvim（自作・公開済み）: Space ? で「やりたいこと」を日本語で聞くと、
+  -- 自分の keymap から該当キーを案内。履歴 ON で :Annai stats が「よく聞く操作
+  -- （まだ覚えてないキー）」を炙り出す。端末内のみ・:Annai history clear で消去。
+  -- ローカルに開発用クローンがあればそれを使い、無ければ公開版を GitHub から取得する
+  -- （フレッシュマシンでもそのまま動くよう、直書きのホームパスは使わない）。
+  {
+    "susumutomita/annai.nvim",
+    dir = (vim.fn.isdirectory(vim.fn.expand("~/product/annai.nvim")) == 1)
+        and vim.fn.expand("~/product/annai.nvim")
+      or nil,
+    event = "VeryLazy",
+    opts = {
+      -- 実用速度優先: afm(Apple, 常駐でコールド始動なし)を先に使う（これが既定の順番）。
+      -- 弱点: 一覧に無い操作だと afm は無理に1つ選ぶ（置換→無関係キー）。
+      --   該当なしの誤答が気になる時だけ backends = { "ollama", "afm" } に変える。
+      ollama = { model = "qwen2.5:3b" }, -- afm 不在/フォールバック時に使用（no-match も正しい）
+      history = { enabled = true },
+      keymap = "<F1>", -- 起動キー。leader を避けて which-key メニューを挟まない。エスカレーションも F1 連打
+    },
   },
 })
 
@@ -213,12 +334,30 @@ end, { desc = "開いているバッファ一覧" })
 map("n", "<leader>fh", function()
   require("telescope.builtin").help_tags()
 end, { desc = "ヘルプ検索" })
+-- 「覚えていない」ときの保険。Space f k で全ショートカットを検索できる
+map("n", "<leader>fk", function()
+  require("telescope.builtin").keymaps()
+end, { desc = "ショートカット一覧を検索" })
+map("n", "<leader>fr", function()
+  require("telescope.builtin").resume()
+end, { desc = "前回の検索を再開" })
+map("n", "<leader>fl", function()
+  require("telescope.builtin").current_buffer_fuzzy_find()
+end, { desc = "このファイル内を検索" })
 
--- ウィンドウ間移動（Ctrl + h/j/k/l で左下上右へ）
-map("n", "<C-h>", "<C-w>h")
-map("n", "<C-j>", "<C-w>j")
-map("n", "<C-k>", "<C-w>k")
-map("n", "<C-l>", "<C-w>l")
+-- ウィンドウ間移動。ファイラー(左)⇄本文(右)はこの 2 つで往復する。
+--   <C-h> = 左の窓へ（本文 → ファイラー） / <C-l> = 右の窓へ（ファイラー → 本文）
+-- ※ nvim-tree は <C-k> を別用途で使うので、ツリー内で「上の窓へ」は効かない（左右で十分）
+map("n", "<C-h>", "<C-w>h", { desc = "左の窓へ（本文→ファイラー）" })
+map("n", "<C-j>", "<C-w>j", { desc = "下の窓へ" })
+map("n", "<C-k>", "<C-w>k", { desc = "上の窓へ" })
+map("n", "<C-l>", "<C-w>l", { desc = "右の窓へ（ファイラー→本文）" })
+
+-- 同じ窓移動を <leader>w にも置く。Space を押せば which-key と Space? ガイドに出る＝覚えなくていい
+map("n", "<leader>wh", "<C-w>h", { desc = "左の窓へ（ファイラー）" })
+map("n", "<leader>wj", "<C-w>j", { desc = "下の窓へ" })
+map("n", "<leader>wk", "<C-w>k", { desc = "上の窓へ" })
+map("n", "<leader>wl", "<C-w>l", { desc = "右の窓へ（本文）" })
 
 -- Claude Code は Ctrl-, が標準。効かない端末向けに leader+cc でも開ける保険
 map("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Claude Code 開閉" })
@@ -227,138 +366,7 @@ map("n", "<leader>cc", "<cmd>ClaudeCode<CR>", { desc = "Claude Code 開閉" })
 map("n", "<leader>v", "<cmd>LivePreview start<CR>", { desc = "ブラウザでプレビュー開始" })
 map("n", "<leader>V", "<cmd>LivePreview close<CR>", { desc = "プレビュー停止" })
 
---------------------------------------------------------------------------------
--- 5. ローカル LLM ガイド（Space ? で「やりたいこと」を聞くと、実 keymap に基づき回答）
---    バックエンドは afm（Apple オンデバイス LLM / FoundationModels）を優先し、
---    無ければ Ollama にフォールバックする。邪魔しないよう非同期 & 非フォーカス窓で表示。
---    afm のビルド: swiftc -O ~/.config/nvim/afm.swift -o ~/.local/bin/afm
---------------------------------------------------------------------------------
-local guide = {}
-guide.model = "qwen2.5:3b" -- Ollama フォールバック時に使うモデル
-guide.url = "http://localhost:11434/api/generate"
-guide.win = nil
-
--- 既存のガイド窓を閉じる
-local function guide_close()
-  if guide.win and vim.api.nvim_win_is_valid(guide.win) then
-    vim.api.nvim_win_close(guide.win, true)
-  end
-  guide.win = nil
-end
-
--- 右下に非フォーカスのフローティング窓でテキストを表示する
-local function guide_show(text)
-  guide_close()
-  local lines = vim.split(text, "\n", { trimempty = false })
-  local width = 24
-  for _, l in ipairs(lines) do
-    width = math.max(width, vim.fn.strdisplaywidth(l))
-  end
-  width = math.min(width + 2, 56)
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.bo[buf].modifiable = false
-  guide.win = vim.api.nvim_open_win(buf, false, {
-    relative = "editor",
-    anchor = "SE",
-    row = vim.o.lines - 2,
-    col = vim.o.columns - 1,
-    width = width,
-    height = math.min(#lines, 12),
-    style = "minimal",
-    border = "rounded",
-    focusable = false, -- フォーカスを奪わない
-    title = " ガイド ",
-    title_pos = "center",
-    noautocmd = true,
-  })
-  vim.wo[guide.win].wrap = true
-  -- カーソルを動かす / 入力を始めると自動で閉じる（操作を邪魔しない）
-  vim.api.nvim_create_autocmd({ "CursorMoved", "InsertEnter", "BufLeave" }, {
-    once = true,
-    callback = guide_close,
-  })
-end
-
--- リーダー(Space)始まりの自作キーのうち説明付きを集めてプロンプトに渡す。
--- 標準キーの英語/コード/記号を混ぜるとオンデバイスモデルの言語判定が誤作動する
--- (unsupportedLanguageOrLocale) ため、日本語説明の自作キーだけに絞る（幻覚防止も兼ねる）。
-local function guide_keymaps()
-  local out = {}
-  for _, m in ipairs(vim.api.nvim_get_keymap("n")) do
-    if m.desc and m.desc ~= "" and m.lhs:sub(1, 1) == " " then
-      table.insert(out, "Space " .. m.lhs:sub(2) .. " = " .. m.desc)
-    end
-  end
-  return table.concat(out, "\n")
-end
-
--- LLM を実行する。afm（Apple オンデバイス）があれば優先、無ければ Ollama。
-local function guide_run(prompt, on_done)
-  if vim.fn.executable("afm") == 1 then
-    vim.system({ "afm" }, { stdin = prompt, text = true }, function(res)
-      vim.schedule(function()
-        local out = vim.trim(res.stdout or "")
-        if res.code == 0 and out ~= "" then
-          on_done(out)
-        else
-          local msg = vim.trim(res.stderr or "")
-          on_done(nil, msg ~= "" and msg or "afm: 応答なし")
-        end
-      end)
-    end)
-    return
-  end
-  -- フォールバック: Ollama (localhost:11434)
-  local body = vim.json.encode({ model = guide.model, prompt = prompt, stream = false })
-  vim.system({ "curl", "-s", guide.url, "-d", body }, { text = true }, function(res)
-    vim.schedule(function()
-      if res.code ~= 0 then
-        on_done(nil, "afm も Ollama も使えません。afm をビルドするか Ollama を起動してください。")
-        return
-      end
-      local ok, decoded = pcall(vim.json.decode, res.stdout)
-      if not ok or type(decoded) ~= "table" then
-        on_done(nil, "応答の解析に失敗しました。")
-        return
-      end
-      if decoded.error then
-        on_done(nil, "モデル未取得: ollama pull " .. guide.model)
-        return
-      end
-      on_done(vim.trim(decoded.response or ""))
-    end)
-  end)
-end
-
--- LLM へ渡すプロンプト。実 keymap だけから 1 つ選ばせて幻覚を防ぐ。
-local function guide_prompt(input)
-  return table.concat({
-    "あなたは Neovim 操作ガイド。下の一覧から質問に最も合う操作を 1 つだけ選ぶ。",
-    "各行の説明文と質問を照合して選ぶこと。回答は必ず次の形式のみ:",
-    "Space <キー> — <その操作の説明>",
-    "一覧に該当が無ければ「この設定には無い」とだけ答える。前置き・補足は禁止。",
-    "",
-    "# キーマップ一覧",
-    guide_keymaps(),
-    "",
-    "# 質問",
-    input,
-    "",
-    "# 回答",
-  }, "\n")
-end
-
-function guide.ask()
-  vim.ui.input({ prompt = "やりたいこと: " }, function(input)
-    if not input or input == "" then
-      return
-    end
-    guide_show("考え中...")
-    guide_run(guide_prompt(input), function(answer, err)
-      guide_show(answer or ("エラー: " .. (err or "不明")))
-    end)
-  end)
-end
-
-map("n", "<leader>?", guide.ask, { desc = "やりたいことを LLM に聞く" })
+-- annai は F1 が主。忘れた時用に Space → ? でも見つかるよう which-key に載せる（押せば起動）
+map("n", "<leader>?", function()
+  require("annai").ask()
+end, { desc = "案内 annai（F1 でも可）" })
